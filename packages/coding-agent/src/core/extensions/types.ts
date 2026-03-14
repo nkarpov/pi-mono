@@ -1082,6 +1082,9 @@ export interface ExtensionAPI {
 	/** Append a custom entry to the session for state persistence (not sent to LLM). */
 	appendEntry<T = unknown>(customType: string, data?: T): void;
 
+	/** Continue execution from the current synchronized session state without adding a new user message. */
+	continueSession(): Promise<void>;
+
 	/** Replace the current session contents from an external canonical snapshot. */
 	replaceSessionContents(snapshot: SessionSnapshot, options?: SessionSyncOptions): Promise<void>;
 
@@ -1306,6 +1309,8 @@ export type SendUserMessageHandler = (
 
 export type AppendEntryHandler = <T = unknown>(customType: string, data?: T) => void;
 
+export type ContinueSessionHandler = () => Promise<void>;
+
 export type ReplaceSessionContentsHandler = (snapshot: SessionSnapshot, options?: SessionSyncOptions) => Promise<void>;
 
 export type ImportSessionEntriesHandler = (
@@ -1364,6 +1369,7 @@ export interface ExtensionActions {
 	sendMessage: SendMessageHandler;
 	sendUserMessage: SendUserMessageHandler;
 	appendEntry: AppendEntryHandler;
+	continueSession: ContinueSessionHandler;
 	replaceSessionContents: ReplaceSessionContentsHandler;
 	importSessionEntries: ImportSessionEntriesHandler;
 	setSessionName: SetSessionNameHandler;

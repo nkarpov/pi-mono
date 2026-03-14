@@ -54,6 +54,7 @@ describe("ExtensionRunner", () => {
 		sendMessage: () => {},
 		sendUserMessage: () => {},
 		appendEntry: () => {},
+		continueSession: async () => {},
 		replaceSessionContents: async () => {},
 		importSessionEntries: async () => [],
 		setSessionName: () => {},

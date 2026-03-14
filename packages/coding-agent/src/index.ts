@@ -63,6 +63,7 @@ export type {
 	CompactOptions,
 	ContextEvent,
 	ContextUsage,
+	ContinueSessionHandler,
 	CustomToolCallEvent,
 	EditToolCallEvent,
 	ExecOptions,
