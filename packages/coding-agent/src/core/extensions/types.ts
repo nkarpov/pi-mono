@@ -39,6 +39,7 @@ import type {
 } from "@mariozechner/pi-tui";
 import type { Static, TSchema } from "@sinclair/typebox";
 import type { Theme } from "../../modes/interactive/theme/theme.js";
+import type { AgentSessionEvent } from "../agent-session.js";
 import type { BashResult } from "../bash-executor.js";
 import type { CompactionPreparation, CompactionResult } from "../compaction/index.js";
 import type { EventBus } from "../event-bus.js";
@@ -52,6 +53,7 @@ import type {
 	CompactionEntry,
 	ReadonlySessionManager,
 	SessionEntry,
+	SessionHeader,
 	SessionManager,
 } from "../session-manager.js";
 import type { SlashCommandInfo } from "../slash-commands.js";
@@ -235,6 +237,12 @@ export interface ExtensionUIContext {
 
 	/** Set tool output expansion state. */
 	setToolsExpanded(expanded: boolean): void;
+
+	/** Render an externally-produced session event through the active UI. */
+	renderExternalEvent(event: AgentSessionEvent): Promise<void>;
+
+	/** Rebuild the chat transcript from the current synchronized session state. */
+	rebuildChatFromSession(): void;
 }
 
 // ============================================================================
@@ -936,6 +944,23 @@ export interface RegisteredCommand {
 	handler: (args: string, ctx: ExtensionCommandContext) => Promise<void>;
 }
 
+export interface SessionSyncOptions {
+	/** Restore the synchronized session's model, if available locally. */
+	restoreModel?: boolean;
+	/** Restore the synchronized session's thinking level. */
+	restoreThinkingLevel?: boolean;
+}
+
+export interface ImportSessionEntriesOptions extends SessionSyncOptions {
+	/** Skip entries whose IDs already exist. Default: true */
+	skipExistingIds?: boolean;
+}
+
+export interface SessionSnapshot {
+	header: SessionHeader;
+	entries: SessionEntry[];
+}
+
 // ============================================================================
 // Extension API
 // ============================================================================
@@ -1056,6 +1081,12 @@ export interface ExtensionAPI {
 
 	/** Append a custom entry to the session for state persistence (not sent to LLM). */
 	appendEntry<T = unknown>(customType: string, data?: T): void;
+
+	/** Replace the current session contents from an external canonical snapshot. */
+	replaceSessionContents(snapshot: SessionSnapshot, options?: SessionSyncOptions): Promise<void>;
+
+	/** Import externally produced committed session entries into the current session. */
+	importSessionEntries(entries: SessionEntry[], options?: ImportSessionEntriesOptions): Promise<string[]>;
 
 	// =========================================================================
 	// Session Metadata
@@ -1275,6 +1306,13 @@ export type SendUserMessageHandler = (
 
 export type AppendEntryHandler = <T = unknown>(customType: string, data?: T) => void;
 
+export type ReplaceSessionContentsHandler = (snapshot: SessionSnapshot, options?: SessionSyncOptions) => Promise<void>;
+
+export type ImportSessionEntriesHandler = (
+	entries: SessionEntry[],
+	options?: ImportSessionEntriesOptions,
+) => Promise<string[]>;
+
 export type SetSessionNameHandler = (name: string) => void;
 
 export type GetSessionNameHandler = () => string | undefined;
@@ -1326,6 +1364,8 @@ export interface ExtensionActions {
 	sendMessage: SendMessageHandler;
 	sendUserMessage: SendUserMessageHandler;
 	appendEntry: AppendEntryHandler;
+	replaceSessionContents: ReplaceSessionContentsHandler;
+	importSessionEntries: ImportSessionEntriesHandler;
 	setSessionName: SetSessionNameHandler;
 	getSessionName: GetSessionNameHandler;
 	setLabel: SetLabelHandler;

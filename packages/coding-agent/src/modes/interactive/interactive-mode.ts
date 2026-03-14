@@ -1482,6 +1482,8 @@ export class InteractiveMode {
 			},
 			getToolsExpanded: () => this.toolOutputExpanded,
 			setToolsExpanded: (expanded) => this.setToolsExpanded(expanded),
+			renderExternalEvent: (event) => this.renderExternalEvent(event),
+			rebuildChatFromSession: () => this.rebuildChatFromSession(),
 		};
 	}
 
@@ -2603,6 +2605,24 @@ export class InteractiveMode {
 		this.chatContainer.clear();
 		const context = this.sessionManager.buildSessionContext();
 		this.renderSessionContext(context);
+	}
+
+	/**
+	 * Rebuild the visible transcript from the current session manager state.
+	 * Useful after importing or replacing externally synchronized session entries.
+	 */
+	rebuildChatFromSession(): void {
+		this.rebuildChatFromMessages();
+		this.footer.invalidate();
+		this.ui.requestRender();
+	}
+
+	/**
+	 * Render an externally produced session event through the standard Pi UI.
+	 * This is intended for live remote/mirrored event playback.
+	 */
+	async renderExternalEvent(event: AgentSessionEvent): Promise<void> {
+		await this.handleEvent(event);
 	}
 
 	// =========================================================================

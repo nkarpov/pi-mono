@@ -75,6 +75,8 @@ export type {
 	GetThinkingLevelHandler,
 	GrepToolCallEvent,
 	GrepToolResultEvent,
+	ImportSessionEntriesHandler,
+	ImportSessionEntriesOptions,
 	// Events - Input
 	InputEvent,
 	InputEventResult,
@@ -100,6 +102,7 @@ export type {
 	// Commands
 	RegisteredCommand,
 	RegisteredTool,
+	ReplaceSessionContentsHandler,
 	// Events - Resources
 	ResourcesDiscoverEvent,
 	ResourcesDiscoverResult,
@@ -120,9 +123,11 @@ export type {
 	SessionEvent,
 	SessionForkEvent,
 	SessionShutdownEvent,
+	SessionSnapshot,
 	// Events - Session
 	SessionStartEvent,
 	SessionSwitchEvent,
+	SessionSyncOptions,
 	SessionTreeEvent,
 	SetActiveToolsHandler,
 	SetLabelHandler,

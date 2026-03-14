@@ -72,7 +72,13 @@ import type { BashExecutionMessage, CustomMessage } from "./messages.js";
 import type { ModelRegistry } from "./model-registry.js";
 import { expandPromptTemplate, type PromptTemplate } from "./prompt-templates.js";
 import type { ResourceExtensionPaths, ResourceLoader } from "./resource-loader.js";
-import type { BranchSummaryEntry, CompactionEntry, SessionManager } from "./session-manager.js";
+import type {
+	BranchSummaryEntry,
+	CompactionEntry,
+	SessionEntry,
+	SessionHeader,
+	SessionManager,
+} from "./session-manager.js";
 import { getLatestCompactionEntry } from "./session-manager.js";
 import type { SettingsManager } from "./settings-manager.js";
 import { BUILTIN_SLASH_COMMANDS, type SlashCommandInfo, type SlashCommandLocation } from "./slash-commands.js";
@@ -166,6 +172,18 @@ export interface PromptOptions {
 	streamingBehavior?: "steer" | "followUp";
 	/** Source of input for extension input event handlers. Defaults to "interactive". */
 	source?: InputSource;
+}
+
+export interface SessionSyncOptions {
+	/** Restore the model encoded in the synchronized session, if available locally. */
+	restoreModel?: boolean;
+	/** Restore the thinking level encoded in the synchronized session. */
+	restoreThinkingLevel?: boolean;
+}
+
+export interface ImportSessionEntriesOptions extends SessionSyncOptions {
+	/** Skip entries whose IDs already exist. Default: true */
+	skipExistingIds?: boolean;
 }
 
 /** Result from cycleModel() */
@@ -2120,6 +2138,12 @@ export class AgentSession {
 				appendEntry: (customType, data) => {
 					this.sessionManager.appendCustomEntry(customType, data);
 				},
+				replaceSessionContents: async (snapshot, options) => {
+					await this.replaceSessionContents(snapshot.header, snapshot.entries, options);
+				},
+				importSessionEntries: async (entries, options) => {
+					return this.importSessionEntries(entries, options);
+				},
 				setSessionName: (name) => {
 					this.sessionManager.appendSessionInfo(name);
 				},
@@ -2626,6 +2650,75 @@ export class AgentSession {
 
 		this._reconnectToAgent();
 		return true;
+	}
+
+	private _ensureSessionSyncAllowed(): void {
+		if (this.isStreaming) {
+			throw new Error("Cannot synchronize session state while the agent is streaming");
+		}
+		if (this.pendingMessageCount > 0) {
+			throw new Error("Cannot synchronize session state while queued messages are pending");
+		}
+	}
+
+	private async _refreshAgentFromSessionManager(options?: SessionSyncOptions): Promise<void> {
+		const sessionContext = this.sessionManager.buildSessionContext();
+		this.agent.sessionId = this.sessionManager.getSessionId();
+		this.agent.replaceMessages(sessionContext.messages);
+
+		if (options?.restoreModel && sessionContext.model) {
+			const previousModel = this.model;
+			const match = this._modelRegistry
+				.getAvailable()
+				.find((m) => m.provider === sessionContext.model!.provider && m.id === sessionContext.model!.modelId);
+			if (match) {
+				this.agent.setModel(match);
+				await this._emitModelSelect(match, previousModel, "restore");
+			}
+		}
+
+		if (options?.restoreThinkingLevel) {
+			const availableLevels = this.getAvailableThinkingLevels();
+			const desiredLevel = sessionContext.thinkingLevel as ThinkingLevel;
+			const effectiveLevel = availableLevels.includes(desiredLevel)
+				? desiredLevel
+				: this._clampThinkingLevel(desiredLevel, availableLevels);
+			this.agent.setThinkingLevel(effectiveLevel);
+		}
+	}
+
+	/**
+	 * Replace the full session contents from an external canonical snapshot and
+	 * refresh the local agent context from the synchronized entries.
+	 */
+	async replaceSessionContents(
+		header: SessionHeader,
+		entries: SessionEntry[],
+		options?: SessionSyncOptions,
+	): Promise<void> {
+		this._ensureSessionSyncAllowed();
+		this._steeringMessages = [];
+		this._followUpMessages = [];
+		this._pendingNextTurnMessages = [];
+
+		this.sessionManager.replaceContents(header, entries);
+		await this._refreshAgentFromSessionManager(options);
+	}
+
+	/**
+	 * Import externally produced committed entries into the current session and
+	 * refresh the local agent context. Returns the IDs that were imported.
+	 */
+	async importSessionEntries(entries: SessionEntry[], options?: ImportSessionEntriesOptions): Promise<string[]> {
+		this._ensureSessionSyncAllowed();
+		const importedIds = this.sessionManager.importEntries(entries, {
+			skipExistingIds: options?.skipExistingIds,
+		});
+		if (importedIds.length === 0) {
+			return importedIds;
+		}
+		await this._refreshAgentFromSessionManager(options);
+		return importedIds;
 	}
 
 	/**

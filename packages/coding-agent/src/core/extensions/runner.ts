@@ -193,6 +193,8 @@ const noOpUIContext: ExtensionUIContext = {
 	setTheme: (_theme: string | Theme) => ({ success: false, error: "UI not available" }),
 	getToolsExpanded: () => false,
 	setToolsExpanded: () => {},
+	renderExternalEvent: async () => {},
+	rebuildChatFromSession: () => {},
 };
 
 export class ExtensionRunner {
@@ -240,6 +242,8 @@ export class ExtensionRunner {
 		this.runtime.sendMessage = actions.sendMessage;
 		this.runtime.sendUserMessage = actions.sendUserMessage;
 		this.runtime.appendEntry = actions.appendEntry;
+		this.runtime.replaceSessionContents = actions.replaceSessionContents;
+		this.runtime.importSessionEntries = actions.importSessionEntries;
 		this.runtime.setSessionName = actions.setSessionName;
 		this.runtime.getSessionName = actions.getSessionName;
 		this.runtime.setLabel = actions.setLabel;
