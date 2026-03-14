@@ -40,6 +40,11 @@ export interface NewSessionOptions {
 	parentSession?: string;
 }
 
+export interface ImportSessionEntriesOptions {
+	/** Skip entries whose IDs already exist in the current session. Default: true */
+	skipExistingIds?: boolean;
+}
+
 export interface SessionEntryBase {
 	type: string;
 	id: string;
@@ -800,9 +805,7 @@ export class SessionManager {
 		}
 
 		if (!this.flushed) {
-			for (const e of this.fileEntries) {
-				appendFileSync(this.sessionFile, `${JSON.stringify(e)}\n`);
-			}
+			this._rewriteFile();
 			this.flushed = true;
 		} else {
 			appendFileSync(this.sessionFile, `${JSON.stringify(entry)}\n`);
@@ -950,6 +953,66 @@ export class SessionManager {
 		};
 		this._appendEntry(entry);
 		return entry.id;
+	}
+
+	/**
+	 * Replace the full session contents with externally provided canonical state.
+	 * Useful for reconnect/bootstrap when a local replica needs to hydrate from
+	 * an authoritative snapshot.
+	 */
+	replaceContents(header: SessionHeader, entries: SessionEntry[]): void {
+		if (header.type !== "session") {
+			throw new Error("replaceContents() requires a session header");
+		}
+
+		this.fileEntries = [structuredClone(header), ...structuredClone(entries)];
+		migrateToCurrentVersion(this.fileEntries);
+		const nextHeader = this.getHeader();
+		if (!nextHeader) {
+			throw new Error("replaceContents() produced an invalid session");
+		}
+
+		this.sessionId = nextHeader.id;
+		this.cwd = nextHeader.cwd;
+		this._buildIndex();
+
+		if (this.persist) {
+			this._rewriteFile();
+			this.flushed = true;
+		} else {
+			this.flushed = false;
+		}
+	}
+
+	/**
+	 * Import externally provided entries into the current session without
+	 * replaying them as local user input. Returns the IDs that were imported.
+	 */
+	importEntries(entries: SessionEntry[], options?: ImportSessionEntriesOptions): string[] {
+		const skipExistingIds = options?.skipExistingIds ?? true;
+		const importedIds: string[] = [];
+		const existingIds = new Set(this.byId.keys());
+
+		for (const entry of structuredClone(entries)) {
+			if (existingIds.has(entry.id)) {
+				if (skipExistingIds) continue;
+				throw new Error(`Entry ${entry.id} already exists`);
+			}
+			this.fileEntries.push(entry);
+			importedIds.push(entry.id);
+			existingIds.add(entry.id);
+		}
+
+		if (importedIds.length === 0) {
+			return importedIds;
+		}
+
+		this._buildIndex();
+		if (this.persist) {
+			this._rewriteFile();
+			this.flushed = true;
+		}
+		return importedIds;
 	}
 
 	// =========================================================================

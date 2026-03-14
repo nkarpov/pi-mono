@@ -125,6 +125,8 @@ export function createExtensionRuntime(): ExtensionRuntime {
 		sendMessage: notInitialized,
 		sendUserMessage: notInitialized,
 		appendEntry: notInitialized,
+		replaceSessionContents: () => Promise.reject(new Error("Extension runtime not initialized")),
+		importSessionEntries: () => Promise.reject(new Error("Extension runtime not initialized")),
 		setSessionName: notInitialized,
 		getSessionName: notInitialized,
 		setLabel: notInitialized,
@@ -224,6 +226,14 @@ function createExtensionAPI(
 
 		appendEntry(customType: string, data?: unknown): void {
 			runtime.appendEntry(customType, data);
+		},
+
+		replaceSessionContents(snapshot, options) {
+			return runtime.replaceSessionContents(snapshot, options);
+		},
+
+		importSessionEntries(entries, options) {
+			return runtime.importSessionEntries(entries, options);
 		},
 
 		setSessionName(name: string): void {

@@ -108,6 +108,71 @@ describe("InteractiveMode.createExtensionUIContext setTheme", () => {
 	});
 });
 
+describe("InteractiveMode.createExtensionUIContext external sync helpers", () => {
+	test("exposes renderExternalEvent and rebuildChatFromSession through the UI context", async () => {
+		const fakeThis: any = {
+			renderExternalEvent: vi.fn(async () => {}),
+			rebuildChatFromSession: vi.fn(),
+			addExtensionTerminalInputListener: vi.fn(() => () => {}),
+			setExtensionStatus: vi.fn(),
+			setExtensionWidget: vi.fn(),
+			setExtensionFooter: vi.fn(),
+			setExtensionHeader: vi.fn(),
+			showExtensionSelector: vi.fn(async () => undefined),
+			showExtensionConfirm: vi.fn(async () => false),
+			showExtensionInput: vi.fn(async () => undefined),
+			showExtensionNotify: vi.fn(),
+			showExtensionCustom: vi.fn(async () => undefined),
+			showExtensionEditor: vi.fn(async () => undefined),
+			setCustomEditorComponent: vi.fn(),
+			setToolsExpanded: vi.fn(),
+			loadingAnimation: undefined,
+			pendingWorkingMessage: undefined,
+			defaultWorkingMessage: "Working...",
+			ui: { terminal: { setTitle: vi.fn() }, requestRender: vi.fn() },
+			editor: { handleInput: vi.fn(), setText: vi.fn(), getExpandedText: vi.fn(() => ""), getText: vi.fn(() => "") },
+			settingsManager: {
+				getTheme: vi.fn(() => "dark"),
+				setTheme: vi.fn(),
+			},
+			toolOutputExpanded: false,
+		};
+
+		const uiContext = (InteractiveMode as any).prototype.createExtensionUIContext.call(fakeThis);
+		const event = { type: "agent_start" };
+		await uiContext.renderExternalEvent(event);
+		uiContext.rebuildChatFromSession();
+
+		expect(fakeThis.renderExternalEvent).toHaveBeenCalledWith(event);
+		expect(fakeThis.rebuildChatFromSession).toHaveBeenCalledTimes(1);
+	});
+});
+
+describe("InteractiveMode public external sync methods", () => {
+	test("renderExternalEvent delegates to handleEvent", async () => {
+		const fakeThis: any = {
+			handleEvent: vi.fn(async () => {}),
+		};
+
+		const event = { type: "agent_end" };
+		await (InteractiveMode as any).prototype.renderExternalEvent.call(fakeThis, event);
+		expect(fakeThis.handleEvent).toHaveBeenCalledWith(event);
+	});
+
+	test("rebuildChatFromSession rebuilds and rerenders", () => {
+		const fakeThis: any = {
+			rebuildChatFromMessages: vi.fn(),
+			footer: { invalidate: vi.fn() },
+			ui: { requestRender: vi.fn() },
+		};
+
+		(InteractiveMode as any).prototype.rebuildChatFromSession.call(fakeThis);
+		expect(fakeThis.rebuildChatFromMessages).toHaveBeenCalledTimes(1);
+		expect(fakeThis.footer.invalidate).toHaveBeenCalledTimes(1);
+		expect(fakeThis.ui.requestRender).toHaveBeenCalledTimes(1);
+	});
+});
+
 describe("InteractiveMode.showLoadedResources", () => {
 	beforeAll(() => {
 		initTheme("dark");

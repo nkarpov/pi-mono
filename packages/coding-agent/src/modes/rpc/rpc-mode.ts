@@ -271,6 +271,14 @@ export async function runRpcMode(session: AgentSession): Promise<never> {
 		setToolsExpanded(_expanded: boolean) {
 			// Tool expansion not supported in RPC mode - no TUI
 		},
+
+		async renderExternalEvent() {
+			// External event rendering is not supported in RPC mode
+		},
+
+		rebuildChatFromSession() {
+			// Chat rebuilding is not supported in RPC mode
+		},
 	});
 
 	// Set up extensions with RPC-based UI context
