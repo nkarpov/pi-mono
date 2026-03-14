@@ -1260,6 +1260,52 @@ export class AgentSession {
 	}
 
 	/**
+	 * Continue execution from the current synchronized session state without
+	 * appending a new user message. Useful for externally synchronized sessions
+	 * where the latest user entry is already present in the transcript.
+	 */
+	async continueSession(): Promise<void> {
+		if (this.isStreaming) {
+			throw new Error("Agent is already processing");
+		}
+
+		this._flushPendingBashMessages();
+
+		if (!this.model) {
+			throw new Error(
+				"No model selected.\n\n" +
+					`Use /login or set an API key environment variable. See ${join(getDocsPath(), "providers.md")}\n\n` +
+					"Then use /model to select a model.",
+			);
+		}
+
+		const apiKey = await this._modelRegistry.getApiKey(this.model);
+		if (!apiKey) {
+			const isOAuth = this._modelRegistry.isUsingOAuth(this.model);
+			if (isOAuth) {
+				throw new Error(
+					`Authentication failed for "${this.model.provider}". ` +
+						`Credentials may have expired or network is unavailable. ` +
+						`Run '/login ${this.model.provider}' to re-authenticate.`,
+				);
+			}
+			throw new Error(
+				`No API key found for ${this.model.provider}.\n\n` +
+					`Use /login or set an API key environment variable. See ${join(getDocsPath(), "providers.md")}`,
+			);
+		}
+
+		const lastAssistant = this._findLastAssistantMessage();
+		if (lastAssistant) {
+			await this._checkCompaction(lastAssistant, false);
+		}
+
+		this.agent.setSystemPrompt(this._baseSystemPrompt);
+		await this.agent.continue();
+		await this.waitForRetry();
+	}
+
+	/**
 	 * Clear all queued messages and return them.
 	 * Useful for restoring to editor when user aborts.
 	 * @returns Object with steering and followUp arrays
@@ -2137,6 +2183,9 @@ export class AgentSession {
 				},
 				appendEntry: (customType, data) => {
 					this.sessionManager.appendCustomEntry(customType, data);
+				},
+				continueSession: async () => {
+					await this.continueSession();
 				},
 				replaceSessionContents: async (snapshot, options) => {
 					await this.replaceSessionContents(snapshot.header, snapshot.entries, options);

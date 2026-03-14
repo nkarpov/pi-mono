@@ -41,6 +41,7 @@ export type {
 	// Event Results
 	ContextEventResult,
 	ContextUsage,
+	ContinueSessionHandler,
 	CustomToolCallEvent,
 	CustomToolResultEvent,
 	EditToolCallEvent,
