@@ -50,6 +50,7 @@ export interface CustomMessage<T = unknown> {
 	display: boolean;
 	details?: T;
 	timestamp: number;
+	excludeFromContext?: boolean;
 }
 
 export interface BranchSummaryMessage {
@@ -126,6 +127,7 @@ export function createCustomMessage(
 	display: boolean,
 	details: unknown | undefined,
 	timestamp: string,
+	excludeFromContext?: boolean,
 ): CustomMessage {
 	return {
 		role: "custom",
@@ -134,6 +136,7 @@ export function createCustomMessage(
 		display,
 		details,
 		timestamp: new Date(timestamp).getTime(),
+		excludeFromContext,
 	};
 }
 
@@ -160,6 +163,9 @@ export function convertToLlm(messages: AgentMessage[]): Message[] {
 						timestamp: m.timestamp,
 					};
 				case "custom": {
+					if (m.excludeFromContext) {
+						return undefined;
+					}
 					const content = typeof m.content === "string" ? [{ type: "text" as const, text: m.content }] : m.content;
 					return {
 						role: "user",
